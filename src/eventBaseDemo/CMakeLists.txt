@@ -1,0 +1,2 @@
+add_executable(event_baseDemo event_baseDemo.cc)
+target_link_libraries(event_baseDemo event event_core)
