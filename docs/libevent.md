@@ -788,6 +788,132 @@ int event_base_priority_init(struct event_base * base, int n_priority);
 ```
 > 最好在任何事件激活之前调用该函数，最佳时间：创建`event_base`之后调用。
 
+### 事件循环`event_loop`
+一旦有一些已经注册了某些事件的`event_base`，就需要让`libevent`等待并通知时间的发生。
 
+```cpp
+#define EVLOOP_ONCE                                                            \
+  0x01  // 循环等待某些事件成为激活的,执行激活的事件，直到没有更多的事件可执行则返回
+#define EVLOOP_NONBLOCK         0x02  //循环不会等待事件触发，只要事件就绪立刻触发
+#define EVLOOP_NO_EXIT_ON_EMPTY 0x04
+
+/**
+ * @brief  运行直到注册的event_base中没有已经注册的事件为止
+ *					函数重复检查是否有已注册事件发生，如果有事件发生，则将该事件标记为激活的
+ * @param  base
+ * @param  flags
+ * @return int
+ * */
+int event_base_loop(struct event_base *base, int flags);
+```
+`event_base_loop`算法概要：
+```cpp
+while(any events are registered with loop or EVLOOP_NO_EXIT_ON_EMPTY set) {
+  if(EVLOOP_NONBLOCK was set, or any events are already active){
+    If any registered events have triggered, mark them active
+  }else {
+    wait until at least one event has triggered, and mark it active
+  }
+
+  for(p = 0; p < n_priorities;++p){
+    if (any event with priority of p is active){
+      Run all active events with priority of p
+      break
+    }
+  }
+
+  if(EVLOOP_ONCE was set or EVLOOP_NONBLOCK was set){
+    break
+  }
+}
+```
+```cpp
+/**
+ * @brief 一直运行直到没有已经注册的事件,
+ * 或调用了event_base_loopbreak()或event_base_loopexit()为止
+ * @param  base
+ * @return int
+ * */
+int event_base_dispatch(struct event_base *base);
+```
+#### 停止循环
+```cpp
+/**
+ * @brief 给定时间停止循环，如果timeval为NULL，立刻停止循环
+ * @param  base
+ * @param  t
+ * @return int
+ * */
+int event_base_loopexit(struct event_base *base, const struct timeval *t);
+
+/**
+ * @brief 立刻停止循环
+ * @param  base
+ * @return int
+ * */
+int event_base_loopbreak(struct event_base *base);
+```
+如果正在执行循环，在等待激活时间运行结束，结束循环。
+```cpp
+/**
+ * @Copyright (c) 2021  koritafei
+ * @file eventLoopDemo.cc
+ * @brief
+ * @author koritafei (koritafei@gmail.com)
+ * @version 0.1
+ * @date 2021-06-20 08:06:83
+ *
+ * */
+
+#include <event2/event.h>
+#include <event2/util.h>
+
+#include <iostream>
+
+void cb(int sock, short what, void *arg) {
+  struct event_base *base = (struct event_base *)arg;
+  event_base_loopbreak(base);
+}
+
+void main_loop(struct event_base *base, evutil_socket_t watchdag_fd) {
+  struct event *watchdag_event;
+  watchdag_event = event_new(base, watchdag_fd, EV_READ, cb, base);
+
+  event_add(watchdag_event, NULL);
+  event_base_dispatch(base);
+}
+
+void run_base_with_ticks(struct event_base *base) {
+  struct timeval ten_sec;
+  ten_sec.tv_sec  = 10;
+  ten_sec.tv_usec = 0;
+
+  while (1) {
+    event_base_loopexit(base, &ten_sec);
+    event_base_dispatch(base);
+
+    puts("Ticks");
+  }
+}
+
+int main(int argc, char **argv) {
+  struct event_base *base = event_base_new();
+  run_base_with_ticks(base);
+}
+```
+判断是否正常结束，使用以下函数：
+```cpp
+int event_base_got_break(struct event_base *base);
+int event_base_got_exit(struct event_base *base);
+```
+#### 转储`event_base`状态
+```cpp
+/**
+ * @brief 将event_base的事件和状态完整列表输出到文件中
+ * @param  base
+ * @param  fp
+ * */
+void event_base_dump_events(struct event_base *base, FILE *fp);
+```
 
 
