@@ -915,5 +915,118 @@ int event_base_got_exit(struct event_base *base);
  * */
 void event_base_dump_events(struct event_base *base, FILE *fp);
 ```
+### 事件`event`
+`libevent`的基本操作单元为：事件。
+每个事件代表一组条件的组合：
+* 文件描述符已经就绪，可以读取或写入；
+* 文件描述符变为就绪状态，可以读取或写入(对于边缘触发`IO`);
+* 超时事件；
+* 发生信号；
+* 用户触发事件。
+
+![libevent事件状态变化](./images/libevent事件状态变化.png)
+#### 生成新事件
+`event_new`创建新事件。
+```cpp
+#define EV_TIMEOUT 0x01
+#define EV_READ    0x02
+#define EV_WRITE   0x04
+#define EV_SIGNAL  0x08
+#define EV_PERSIST 0x10
+#define EV_ET      0x20
+
+typedef void (*event_callback_fn)(evutil_socket_t, short, void *);
+
+struct event *event_new(struct event_base *base,
+                        evutil_socket_t    fd,
+                        short              what,
+                        event_callback_fn  cb,
+                        void *             arg);
+
+void event_free(struct event *event);
+```
+使用实例：
+```cpp
+/**
+ * @Copyright (c) 2021  koritafei
+ * @file eventnew.cc
+ * @brief
+ * @author koritafei (koritafei@gmail.com)
+ * @version 0.1
+ * @date 2021-06-21 03:06:55
+ *
+ * */
+
+#include <event2/event.h>
+
+void cb(evutil_socket_t fd, short what, void *arg) {
+  const char *data = (const char *)arg;
+  printf("Got an event on socket %d:%s%s%s%s [%s]\n",
+         (int)fd,
+         (what & EV_TIMEOUT) ? "timeout" : "",
+         (what & EV_READ) ? "read" : "",
+         (what & EV_WRITE) ? "write" : "",
+         (what & EV_SIGNAL) ? "signal" : "",
+         data);
+}
+
+void main_loop(evutil_socket_t fd1, evutil_socket_t fd2) {
+  struct event *     ev1, *ev2;
+  struct timeval     five_second = {5, 0};
+  struct event_base *base        = event_base_new();
+
+  ev1 = event_new(base,
+                  fd1,
+                  EV_TIMEOUT | EV_READ | EV_PERSIST,
+                  cb,
+                  (char *)("Read Event"));
+  ev2 =
+      event_new(base, fd2, EV_WRITE | EV_PERSIST, cb, (char *)("Write Event"));
+
+  event_add(ev1, &five_second);
+  event_add(ev2, NULL);
+  event_base_dispatch(base);
+}
+```
+#### 信号事件
+信号处理器构造：
+```cpp
+#define evsignal_new(base, signum, cb, arg)                                    \
+  event_new(base, signum, EV_SIGNAL | EV_PERSIST, cb, arg)
+#define evsignal_add(ev, tv)               event_add((ev), (tv))
+#define evsignal_del(ev)                   event_del(ev)
+#define evsignal_pending(ev, what, tv_out) event_pending((ev), (what), (tv_out))
+```
+### 检查事件状态
+```cpp
+int event_pending(const struct event *ev, short what, struct timeval *tv_out);
+#define event_get_signal(ev)                                                   \
+  evutil_socket_t event_get_fd(const struct event *ev);
+struct event_base *event_get_base(const struct event *ev);
+short              event_get_events(const struct event *ev);
+event_callback_fn  event_get_callback(const struct event *ev);
+void *             event_get_callback_arg(const struct event *ev);
+int                event_get_priority(const struct event *ev);
+void               event_get_assignment(const struct event *event,
+                                        struct event_base **base_out,
+                                        int *               fd_out,
+                                        short *             events_out,
+                                        event_callback_fn * callback_out,
+                                        void **             arg_out);
+```
+一次触发事件，处理不需要多次添加的事件，或添加后立即删除的事件。
+```cpp
+int event_base_once(struct event_base *,
+                    evutil_socket_t,
+                    short,
+                    void (*)(evutil_socket_t, short, void *),
+                    void *,
+                    const struct timeval *);
+```
+手动激活事件：
+```cpp
+void event_active(struct event *ev, int what, short ncalls);
+```
+![事件状态转化](./images/事件状态转化.png)
 
 
