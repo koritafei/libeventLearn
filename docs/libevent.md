@@ -1029,4 +1029,296 @@ void event_active(struct event *ev, int what, short ncalls);
 ```
 ![事件状态转化](./images/事件状态转化.png)
 
+### 数据缓冲`Bufferevent`
+`libevent`提供了一个通用机制，实现缓冲区`IO`。
+`Bufferevent`类型：
+* `基于套接字的bufferevent`: 使用`event_*`作为后端，通过底层流式套接字发送或接收数据的`bufferevent`;
+* `异步IO Bufferevent`: `windows`中使用`IOCP`，通过底层流式套接字发送或接收数据的`bufferevent`;
+* `过滤型Bufferevent`: 将数据传输到底层`bufferevent`之前, 处理输入或输出的`BufferEvent`;
+* `成对的Bufferevent`: 相互传输数据的`bufferevent`.
+
+#### `bufferevent和evbuffer`
+每个`bufferevent`都有一个输入缓冲区和输出缓冲区。其类型均为：`struct evbuffer`。
+#### 回调和水位
+每个`bufferevent`有两个数据相关的回调：一个读取回调和一个写入回调。
+通过调整回调相关的`watermark`(水位), 覆盖这些函数的默认行为，四种`watermark`如下：
+1. **读取低水位**：读取操作使得当输入缓冲区的在此级别或者更高时，读取回调将被调用。默认值为`0`, 每个读取操作都会被导致读取回调被调用；
+2. **读取高水位**：输入缓冲区的数量达到此级别之后，`bufferevent`会停止读取，直到输入缓冲区中有足够数据被抽取，使得输入缓冲区数量低于此级别。默认值是无限。
+3. **写入低水位**：写入操作使得输出缓冲区的数量达到或低于此级别时，写入回调将被调用。默认值为0，只有缓冲区为空时才会调用写入回调。
+4. **写入高水位**：没有直接使用该水位。
+
+`bufferevent`标志位：
+|            标识            |                                            含义                                             |
+| :------------------------: | :-----------------------------------------------------------------------------------------: |
+|  `BEV_OPT_CLOSE_ON_FREE`   |         关闭`bufferevent`时关闭底层传输接口,关闭底层套接字，释放底层`bufferevent`等         |
+|    `BEV_OPT_THREADSAFE`    |                           自动为`bufferevent`分配锁，保证线程安全                           |
+| `BEV_OPT_DEFER_CALLBACKS`  |                                    `bufferevent`回调延迟                                    |
+| `BEV_OPT_UNLOCK_CALLBACKS` | 默认情况下，如果设置`bufferevent`线程安全的，则在调用用户回调时，会被锁定。该选项会将解锁。 |
+
+```cpp
+/**
+ * @brief 创建一个基于socket的bufferevent
+ * @param  base             
+ * @param  fd               
+ * @param  options          
+ * @return struct bufferevent*
+ * */
+struct bufferevent *bufferevent_socket_new(struct event_base *      base,
+                                           evutil_socket_t          fd,
+                                           enum bufferevent_options options);
+/**
+ * @brief 在bufferevent上启动connect
+ * @param  bev
+ * @param  address
+ * @param  addrlen
+ * @return int
+ * */
+int bufferevent_socket_connect(struct bufferevent *   bev,
+                               const struct sockaddr *address,
+                               int                    addrlen);
+```
+使用示例：
+```cpp
+/**
+ * @Copyright (c) 2021  koritafei
+ * @file buffereventdemo.cc
+ * @brief
+ * @author koritafei (koritafei@gmail.com)
+ * @version 0.1
+ * @date 2021-06-22 02:06:02
+ *
+ * */
+
+#include <event2/bufferevent.h>
+#include <event2/event.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+
+void eventcb(struct bufferevent* bev, short event, void* ptr) {
+  if (event & BEV_EVENT_CONNECTED) {
+    printf("connected \n");
+  } else if (event & BEV_EVENT_ERROR) {
+    printf("errored\n");
+  }
+}
+
+int main_loop() {
+  struct event_base*  base;
+  struct bufferevent* bev;
+  struct sockaddr_in  sin;
+
+  base = event_base_new();
+  memset(&sin, 0, sizeof(sin));
+  sin.sin_family      = AF_INET;
+  sin.sin_addr.s_addr = INADDR_ANY;
+  sin.sin_port        = htons(8080);
+
+  bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
+  bufferevent_setcb(bev, NULL, NULL, eventcb, NULL);
+
+  if (0 > bufferevent_socket_connect(bev,
+                                     (struct sockaddr*)&sin,
+                                     sizeof(struct sockaddr))) {
+    bufferevent_free(bev);
+    return -1;
+  }
+
+  return 0;
+}
+
+int main(int argc, char** argv) {
+  main_loop();
+}
+```
+`bufferevent`释放：
+```cpp
+/**
+ * @brief 释放bufferevent
+ * @param  bev
+ * */
+void bufferevent_free(struct bufferevent* bev);
+```
+### 操作回调、水位和启用/禁用
+```cpp
+typedef void (*bufferevent_data_cb)(struct bufferevent *bev, void *ctx);
+typedef void (*bufferevent_event_cb)(struct bufferevent *bev,
+                                     short               events,
+                                     void *              ctx);
+
+/**
+ * @brief 修改bufferevent的一个或多个回调
+ * @param  bev
+ * @param  readcb
+ * @param  writecb
+ * @param  eventcb
+ * @param  cbarg
+ * */
+void bufferevent_setcb(struct bufferevent * bev,
+                       bufferevent_data_cb  readcb,
+                       bufferevent_data_cb  writecb,
+                       bufferevent_event_cb eventcb,
+                       void *               cbarg);
+/**
+ * @brief 获取bufferevent的回调函数
+ * @param  bev
+ * @param  readcb_ptr
+ * @param  writecb_ptr
+ * @param  eventcd_ptr
+ * @param  cbarg_ptr
+ * */
+void bufferevent_getcb(struct bufferevent *  bev,
+                       bufferevent_data_cb * readcb_ptr,
+                       bufferevent_data_cb * writecb_ptr,
+                       bufferevent_event_cb *eventcd_ptr,
+                       void **               cbarg_ptr);
+void bufferevent_enable(struct bufferevent *bufev, short event);
+void bufferevent_disable(struct bufferevent *bufev, short event);
+void bufferevent_get_enabled(struct bufferevent *bufev);
+/**
+ * @brief watermark设置
+ * @param  bufev            
+ * @param  events           
+ * @param  lowmark          
+ * @param  highmark         
+ * */
+void bufferevent_setwatermark(struct bufferevent *bufev,
+                              short               events,
+                              size_t              lowmark,
+                              size_t              highmark);
+```
+使用示例：
+```cpp
+/**
+ * @Copyright (c) 2021  koritafei
+ * @file buffereventwatermark.cc
+ * @brief
+ * @author koritafei (koritafei@gmail.com)
+ * @version 0.1
+ * @date 2021-06-22 02:06:17
+ *
+ * */
+
+#include <errno.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
+#include <event2/event.h>
+#include <event2/event_struct.h>
+#include <event2/util.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct info {
+  const char *name;
+  size_t      total_drained;
+};
+
+void read_callback(struct bufferevent *bev, void *ctx) {
+  struct info *    inf    = (struct info *)ctx;
+  struct evbuffer *input  = bufferevent_get_input(bev);
+  size_t           length = evbuffer_get_length(input);
+
+  if (length) {
+    inf->total_drained += length;
+    evbuffer_drain(input, length);
+    printf("Drained %lu bytes from %s\n", (unsigned long)length, inf->name);
+  }
+}
+
+void event_callback(struct bufferevent *bev, short events, void *ctx) {
+  struct info *    inf      = (struct info *)ctx;
+  struct evbuffer *input    = bufferevent_get_input(bev);
+  int              finished = 0;
+
+  if (events & BEV_EVENT_EOF) {
+    size_t length = evbuffer_get_length(input);
+    printf(
+        "Got a close from %s. We drained %lu bytes from it, and had %lu bytes "
+        "left",
+        inf->name,
+        (unsigned long)inf->total_drained,
+        (unsigned long)length);
+    finished = 1;
+  }
+
+  if (events & BEV_EVENT_ERROR) {
+    printf("Got an error from %s:%s\n",
+           inf->name,
+           evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+    finished = 1;
+  }
+
+  if (finished) {
+    free(ctx);
+    bufferevent_free(bev);
+  }
+}
+
+struct bufferevent *setup_bufferevent() {
+  struct bufferevent *b1    = NULL;
+  struct info *       info1 = (struct info *)malloc(sizeof(struct info));
+  info1->name               = "buffer 1";
+  info1->total_drained      = 0;
+
+  bufferevent_setwatermark(b1, EV_READ, 128, 0);
+
+  bufferevent_setcb(b1, read_callback, NULL, event_callback, info1);
+
+  bufferevent_enable(b1, EV_READ);
+
+  return b1;
+}
+```
+### 操作`bufferevent`中的数据
+#### 通过`bufferevent`获得`evbuffer`
+```cpp
+// 获取缓冲区数据
+struct evbuffer *bufferevent_get_input(struct bufferevent *bufev);
+struct evbuffer *bufferevent_get_output(struct bufferevent *bufev);
+// 向缓冲区写入数据
+int bufferevent_write(struct bufferevent *bufev, const void *data, size_t size);
+int bufferevent_write_buffer(struct bufferevent *bufev, struct evbuffer *buf);
+// 从缓冲区读取数据
+size_t bufferevent_read(struct bufferevent *bufev, void *data, size_t size);
+size_t bufferevent_read_buffer(struct bufferevent *bufev, struct evbuffer *buf);
+```
+示例：
+```cpp
+struct proxy_info {
+  struct bufferevent *other_bev;
+};
+
+void read_callback_proxy(struct bufferevent *bev, void *ctx) {
+  struct proxy_info *info = (struct proxy_info *)bev;
+  bufferevent_read_buffer(bev, bufferevent_get_output(info->other_bev));
+}
+
+struct count {
+  unsigned long last_fib[2];
+};
+
+void write_callback_fibonacci(struct bufferevent *bev, void *ctx) {
+  struct count *   c  = (struct count *)ctx;
+  struct evbuffer *ev = evbuffer_new();
+  while (1024 > evbuffer_get_length(ev)) {
+    unsigned long next = c->last_fib[0] + c->last_fib[1];
+    c->last_fib[0]     = c->last_fib[1];
+    c->last_fib[1]     = next;
+
+    evbuffer_add_printf(ev, "%lu", next);
+  }
+
+  bufferevent_write_buffer(bev, ev);
+  evbuffer_free(ev);
+}
+```
+`bufferevent`的清空操作：
+```cpp
+int bufferevent_flush(struct bufferevent *        bev,
+                      short                       iotype,
+                      enum bufferevent_flush_mode state);
+```
+
+
 
