@@ -1319,6 +1319,45 @@ int bufferevent_flush(struct bufferevent *        bev,
                       short                       iotype,
                       enum bufferevent_flush_mode state);
 ```
+### 数据封装`evbuffer`
+实现了向后添加和向前移除数据优化的队列。
 
+```cpp
+struct evbuffer *evbuffer_new();
+void             evbuffer_free(struct evbuffer *ev);
+```
+线程安全：
+```cpp
+int evbuffer_enable_lock(struct evbuffer *buffer, void *lock);
+void evbuffer_lock(struct evbuffer *buffer);
+void evbuffer_unlock(struct evbuffer *buffer);
+```
+检查`evbuffer`:
+```cpp
+/**
+ * @brief 返回evbuffer的长度
+ * @param  bev
+ * @return size_t
+ * */
+size_t evbuffer_get_length(struct evbuffer *bev);
 
+/**
+ * @brief 连续存储在evbuffer前面的字节数，当分开存储时，返回第一个块的字节数
+ * @param  buf
+ * @param  data
+ * @param  datlen
+ * @return int
+ * */
+int evbuffer_add(struct evbuffer *buf, const void *data, size_t datlen);
+// 添加格式化的数据到buf末尾
+int evbuffer_add_printf(struct evbuffer *buf, const char *fmt, ...);
+int evbuffer_add_vprintf(struct evbuffer *buf, const char *fmt, va_list ap);
 
+// 修改缓冲区的最后一块，或添加一块
+int evbuffer_expand(struct evbuffer *buf, size_t datlen);
+```
+`evbuffer`移动
+```cpp
+int evbuffer_add_buffer(struct evbuffer *dst, struct evbuffer *src);
+int evbuffer_remove_buffer(struct evbuffer *src, struct evbuffer *dst, size_t datlen);
+```
