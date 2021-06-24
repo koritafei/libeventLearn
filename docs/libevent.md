@@ -1361,3 +1361,72 @@ int evbuffer_expand(struct evbuffer *buf, size_t datlen);
 int evbuffer_add_buffer(struct evbuffer *dst, struct evbuffer *src);
 int evbuffer_remove_buffer(struct evbuffer *src, struct evbuffer *dst, size_t datlen);
 ```
+### 链接监听器`evconnlistener`
+监听和接受`TCP`链接的方法。
+```cpp
+struct evconnlistener *evconnlistener_new(struct event_base *base,
+                                          evconnlistener_cb  cb,
+                                          void *             ptr,
+                                          unsigned           flag,
+                                          int                backlog,
+                                          evutil_socket_t    fd);
+struct evconnlistener *evconnlistener_new_bind(struct event_base *    base,
+                                               evconnlistener_cb      cb,
+                                               void *                 ptr,
+                                               unsigned               flag,
+                                               int                    backlog,
+                                               const struct sockaddr *sa,
+                                               int                    socklen);
+
+void evconnlistener_free(struct evconnlistener *lev);
+```
+`evconnlistener_new`的`flag`标志：
+|标志|含义|
+|:----:|:----:|
+|`LEV_OPT_LEAVE_SOCKETS_BLOCKING`|默认情况下，链接监听器在接受到新的链接时，会将其设置为非阻塞的，用于`libevent`, 该标志取消这个行为。|
+|`LEV_OPT_CLOSE_ON_FREE`|该标志会使链接释放时，关闭底层套接字|
+|`LEV_OPT_CLOSE_ON_EXEC`|链接监听服务器为底层套接字设置`close-on-exec`标志|
+|`LEV_OPT_REUSEABLE`|套接字端口立即可用|
+|`LEV_OPT_THREADSAFE`|为监听器分配锁，保证多线程安全|
+
+#### 链接监听器回调
+```cpp
+/**
+ * @brief 
+ * 
+ * @param listener 接受链接的链接监听器
+ * @param sock 新接收的套接字
+ * @param addr 接收的链接的地址
+ * @param len 接收的链接地址长度
+ * @param ptr 调用evconnlistener_new时，用户的参数
+ * @return void* 
+ */
+typedef void (*evconnlistener_cb)(struct evconnlistener *listener,
+                                  evutil_socket_t        sock,
+                                  struct sockaddr *      addr,
+                                  int                    len,
+                                  void *                 ptr);
+
+// 停用和启用监听新的链接
+int evconnlistener_disable(struct evconnlistener *lev);
+int evconnlistener_enable(struct evconnlistener *lev);
+
+/**
+ * @brief 重置回调函数
+ * 
+ * @param lev 
+ * @param cb 
+ * @param arg 
+ */
+void evconnlistener_set_cb(struct evconnlistener *lev,
+                           evconnlistener_cb      cb,
+                           void *                 arg);
+
+evutil_socket_t evconnlistener_get_fd(struct evconnlistener *lev);
+struct event_base *evconnlistener_get_base(struct evconnlistener *lev);
+
+typedef void (*evconnlistener_errorcb) (struct evconnlistener *lis, void *ptr);
+void evconnlistener_set_error_cb(struct evconnlistener *lev, evconnlistener_errorcb errcb);
+```
+
+
