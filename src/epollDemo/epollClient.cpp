@@ -96,6 +96,7 @@ int main(int argc, char **argv) {
         recvline[count] = '\0';
         printf("revc data [%s]\n", recvline);
         break;
+        
       }
     }
   }
