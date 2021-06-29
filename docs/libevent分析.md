@@ -47,6 +47,32 @@ public:
 
 ## 基本使用场景和事件流程
 ![libevent流程](./images/libevent流程.png)
+## `libevent`源码组织
+1. 头文件
+   主要是`event.h`: 事件宏定义，接口函数声明，主要结构体`event`声明；
+2. 内部头文件
+   `xxx-internal.h`: 内部数据结构函数，对外不可见；
+3. `libevent`框架
+   `event.c`: `event`整体框架的实现；
+4. 对系统多路`I/O`封装
+   `epoll.c`: 对`epoll`的封装；
+   `select.c`: 对`select`的封装；
+   `devpoll.c`: 对`dev/poll`的封装；
+   `kqueue.c`: 对`kqueue`的封装。
+5. 定时事件管理
+   `min-heap.c`: 以时间为`key`的小根堆
+6. 信号管理
+   `signal.c`: 对信号事件的处理
+7. 辅助功能函数
+   `evutil.h`和`evutil.c`: 辅助功能函数，包括创建一些`socker pair`和一些事件操作比较函数: 加，减和比较等;
+8. 日志
+   `log.h`和`log.c`: 日志函数;
+9. 缓冲区管理
+    `evbuffer.c`和`buffer.c`: `libevent`对缓冲区的封装
+10. 基本数据结构
+    `compat/sys`下的两个源文件：`queue.h`是`libevent`的基本数据结构实现，包括链表，双向链表等;`_libevent_time.h`: 时间操作的结构体定义，函数和定义。
+11. 实用网络库
+    `http和evdns`: 基于`libevent`实现的`http`和异步`dns`查询库。
 
 
 
