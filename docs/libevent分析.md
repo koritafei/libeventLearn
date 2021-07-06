@@ -74,6 +74,6 @@ public:
 11. 实用网络库
     `http和evdns`: 基于`libevent`实现的`http`和异步`dns`查询库。
 
-
+![`libevent`队列管理](./images/libevent队列管理.png)
 
 

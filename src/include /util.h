@@ -100,9 +100,8 @@ int evutil_configure_monotonic_time(struct evutil_monotonic_timer *timer,
  */
 int evutil_gettime_monotonic(struct evutil_monotonic_timer *timer,
                              struct timeval *               tp);
-
 /**
- * @brief
+ * @brief 创建两个相互链接的新的socket 链接
  *
  * @param d
  * @param type
@@ -110,15 +109,56 @@ int evutil_gettime_monotonic(struct evutil_monotonic_timer *timer,
  * @param sv
  * @return int
  */
-int evutil_socketpair(int d, int type, int protocol, int *sv);
+int evutil_socketpair(int d, int type, int protocol, evutil_socket_t sv[2]);
+/**
+ * @brief 设置socket为非阻塞
+ *
+ * @param fd
+ * @return int
+ */
 int evutil_make_socket_nonblocking(evutil_socket_t fd);
+/**
+ * @brief 设置sock可以立刻复用
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_make_listen_socket_reuseable(evutil_socket_t sock);
+/**
+ * @brief socket port 立刻可用
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_make_listen_socket_reuseable_port(evutil_socket_t sock);
+/**
+ * @brief 设置ipv6 socket
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_make_listen_socket_ipv6only(evutil_socket_t sock);
+/**
+ * @brief 关闭socket
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_make_socket_closeonexec(evutil_socket_t sock);
+/**
+ * @brief 当socket 从socket()和accept()创建时，关闭socket
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_closesocket(evutil_socket_t sock);
 #define EV_CLOSESOCKET(s) evutil_closesocket(s)
-
+/**
+ * @brief
+ *
+ * @param sock
+ * @return int
+ */
 int evutil_make_tcp_listen_socket_defferred(evutil_socket_t sock);
 
 #define EVUTIL_SOCKET_ERROR() (errno)
