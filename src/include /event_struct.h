@@ -42,7 +42,7 @@
 #define LIST_ENTRY(type)                                                       \
   struct {                                                                     \
     struct type * le_next;                                                     \
-    struct type **le_prev;                                                     \
+    struct type **le_prev; /*前一个指针的next值*/                       \
   }
 #endif
 
