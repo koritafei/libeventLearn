@@ -33,19 +33,19 @@
 
 struct eventop {
   const char *name;
-  void *(*init)(struct event_base *);
+  void *(*init)(struct event_base *);  // 初始化
   int (*add)(struct event_base *,
              evutil_socket_t fd,
              short           old,
              short           events,
-             void *          fdinfo);
+             void *          fdinfo);  // 注册事件
   int (*del)(struct event_base *,
              evutil_socket_t fd,
              short           old,
              short           events,
-             void *          fdinfo);
-  int (*dispatch)(struct event_base *, struct timeval *);
-  void (*dealloc)(struct event_base *);
+             void *          fdinfo);                                // 删除事件
+  int (*dispatch)(struct event_base *, struct timeval *);  // 事件分发
+  void (*dealloc)(struct event_base *);  // 注销，释放资源
 
   int                       need_reinit;
   enum event_method_feature features;
@@ -93,32 +93,33 @@ struct event_once {
 };
 
 struct event_base {
-  const struct eventop *        evsel;
-  void *                        evbase;
-  struct event_changelist       changelist;
-  const struct eventop *        evsigsel;
-  struct evsig_info             sig;
-  int                           virtual_event_count;
-  int                           virtual_event_count_max;
-  int                           event_count;
-  int                           event_count_max;
-  int                           event_count_active;
-  int                           event_count_active_max;
-  int                           event_gotterm;
-  int                           event_break;
-  int                           event_continue;
-  int                           event_running_priority;
-  int                           running_loop;
-  int                           n_defferreds_queued;
-  struct evcallback_list *      activequeues;
+  const struct eventop *  evsel;  // 可以看做一个class
+  void *                  evbase;
+  struct event_changelist changelist;
+  const struct eventop *  evsigsel;  // 可以看做静态函数
+  struct evsig_info       sig;       // 管理信号的结构体
+  int                     virtual_event_count;
+  int                     virtual_event_count_max;
+  int                     event_count;
+  int                     event_count_max;
+  int                     event_count_active;
+  int                     event_count_active_max;
+  int                     event_gotterm;
+  int                     event_break;
+  int                     event_continue;
+  int                     event_running_priority;
+  int                     running_loop;
+  int                     n_defferreds_queued;
+  struct evcallback_list
+      *                         activequeues;  // 每个一维指针指向一个固定优先级的就绪event序列
   struct evcallback_list        active_later_queue;
   struct common_timeout_list ** common_timeout_queues;
   int                           n_common_timeouts;
   int                           n_common_timeouts_allocated;
   struct event_io_map           io;
   struct event_signal_map       sigmap;
-  struct min_heap               timeheap;
-  struct timeval                tv_cacehd;
+  struct min_heap               timeheap;   // 管理时间的最小堆
+  struct timeval                tv_cacehd;  // 时间管理变量
   struct evutil_monotonic_timer monotonic_timer;
   struct timeval                tv_clock_diff;
   time_t                        last_updated_clock_diff;

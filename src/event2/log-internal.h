@@ -1,5 +1,5 @@
-#ifndef __LOG_INTERNAL_H__
-#define __LOG_INTERNAL_H__
+#ifndef LOG_INTERNAL
+#define LOG_INTERNAL
 
 #include "util.h"
 
@@ -33,7 +33,7 @@ void event_errx(int eval, const char *fmt, ...) EV_CHECK_FMT(2, 3) EV_NORETURN;
 void event_warnx(const char *fmt, ...) EV_CHECK_FMT(1, 2);
 void event_msgx(const char *fmt, ...) EV_CHECK_FMT(1, 2);
 void event_debugx_(const char *fmt, ...) EV_CHECK_FMT(1, 2);
-void event_logx_(int severity, const char *errstr, const char *fmt, va_list va)
+void event_logv_(int severity, const char *errstr, const char *fmt, va_list va)
     EV_CHECK_FMT(3, 0);
 
 #ifdef EVENT_DEBUG_LOGGING_ENABLED
@@ -47,4 +47,4 @@ void event_logx_(int severity, const char *errstr, const char *fmt, va_list va)
 #define event_debug(x) ((void)0)
 #endif
 
-#endif /* __LOG_INTERNAL_H__ */
+#endif /* LOG_INTERNAL */
